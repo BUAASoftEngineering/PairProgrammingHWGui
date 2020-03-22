@@ -11,7 +11,7 @@ void QCPItemHalfLine::draw(QCPPainter *painter)
 
   int rx1,ry1,rx2,ry2;
   rect.getCoords(&rx1, &ry1, &rx2, &ry2);
-  qDebug()<<rx1<<ry1<<rx2<<ry2;
+
   double sx = start.x();
   double sy = start.y();
   double ex = end.x();
@@ -30,7 +30,7 @@ void QCPItemHalfLine::draw(QCPPainter *painter)
   ry1 = ry1 > ry2 ? ry2 : ry1;
 
   rect.setCoords(rx1, ry1, rx2, ry2);
-  qDebug()<<rx1<<ry1<<rx2<<ry2;
+
   QLineF line = getRectClippedStraightLine(start, end-start, rect);
   // paint visible segment, if existent:
   if (!line.isNull())

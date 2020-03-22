@@ -67,6 +67,7 @@ include_directories("${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(BUAASoftwareEngineeringPairProgrammingHWGui
     Qt5::Widgets
     Qt5::PrintSupport
-    ${LIBGEOMETRY_LIB})
+    ${LIBGEOMETRY_LIB}
+    )
 
 qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})

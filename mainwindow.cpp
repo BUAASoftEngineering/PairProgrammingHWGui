@@ -16,30 +16,22 @@ MainWindow::MainWindow(QWidget *parent)
     customPlot->setInteraction(QCP::iSelectItems, true);
     customPlot->setInteraction(QCP::iMultiSelect, true);
 
-
-    drawCircle(0,1,2);
-    drawLine(0,1,1,2);
-    drawHalfLine(0,0,1,1);
-    drawHalfLine(1,1,2,0);
-    drawHalfLine(2,2,1,-2);
-    drawHalfLine(3,3,0,-1);
-    drawHalfLine(2,2,-1,-2);
-    drawHalfLine(1,1,-3,0);
-    drawHalfLine(0,0,-3,7);
-    drawHalfLine(1,2,0,1);
-    drawSegmentLine(1,0,2,1);
-
-    drawPoint(0,0);
-    drawPoint(-1,-1.4);
-
     // give the axes some labels:
     customPlot->xAxis->setLabel("x");
     customPlot->yAxis->setLabel("y");
     // set axes ranges, so we see all data:
 
-    customPlot->xAxis->setRange(-5,5);
-    customPlot->yAxis->setRange(-5,5);
+    customPlot->xAxis->setRange(-range,range);
+    customPlot->yAxis->setRange(-range,range);
     customPlot->replot();
+
+    connect(ui->plot, SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(on_plot_mouseWheel(QWheelEvent*)));
+    connect(ui->plot, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(on_plot_mouseMove(QMouseEvent*)));
+    connect(ui->plot, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(on_plot_mousePress(QMouseEvent*)));
+    // QT connects the below signal-slot pairs automaticly
+    // so DO NOT repeat it
+    // connect(ui->addShapeButton, &QPushButton::clicked, this, &MainWindow::on_addShapeButton_clicked);
+    // connect(ui->shapeTypeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(on_shapeTypeComboBox_currentIndexChanged(int)));
 }
 
 MainWindow::~MainWindow()
@@ -92,21 +84,7 @@ void MainWindow::on_actionOpen_triggered()
             for(int i = 0; i<nShape; ++i) {
                 auto &shape = shapes[i];
                 qDebug() << shape.type;
-                QString id;
-                switch(shape.type) {
-                case 'L':
-                    id = drawLine(shape.x1, shape.y1, shape.x2, shape.y2);
-                    break;
-                case 'R':
-                    id = drawHalfLine(shape.x1, shape.y1, shape.x2, shape.y2);
-                    break;
-                case 'S':
-                    id = drawSegmentLine(shape.x1, shape.y1, shape.x2, shape.y2);
-                    break;
-                case 'C':
-                    id = drawCircle(shape.x1, shape.y1, shape.x2);
-                    break;
-                }
+                QString id = drawShape(shape.type, shape.x1, shape.y1, shape.x2, shape.y2);
                 gShapes.insert(id, shape);
             }
             delete [] shapes;
@@ -122,6 +100,10 @@ QString MainWindow::drawCircle(int x, int y, int r) {
     auto circle = new QCPItemEllipse(ui->plot);
     QPoint topLeft(x-r, y+r);
     QPoint bottomRight(x+r, y-r);
+    QPen pen;
+    pen.setColor(QColor(0xff0000));
+    pen.setWidth(2);
+    circle->setPen(pen);
     circle->topLeft->setCoords(topLeft);
     circle->bottomRight->setCoords(bottomRight);
     QString id = QString::number(getAndIncrementNextGraphId());
@@ -133,6 +115,10 @@ QString MainWindow::drawLine(int x1, int y1, int x2, int y2) {
     auto line = new QCPItemStraightLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
+    QPen pen;
+    pen.setColor(QColor(0x00ff00));
+    pen.setWidth(2);
+    line->setPen(pen);
     line->point1->setCoords(start);
     line->point2->setCoords(end);
     QString id = QString::number(getAndIncrementNextGraphId());
@@ -140,10 +126,34 @@ QString MainWindow::drawLine(int x1, int y1, int x2, int y2) {
     return id;
 }
 
+QString MainWindow::drawShape(char type, int x1, int y1, int x2, int y2)
+{
+    QString id;
+    switch(type) {
+    case 'L':
+        id = drawLine(x1, y1, x2, y2);
+        break;
+    case 'R':
+        id = drawHalfLine(x1, y1, x2, y2);
+        break;
+    case 'S':
+        id = drawSegmentLine(x1, y1, x2, y2);
+        break;
+    case 'C':
+        id = drawCircle(x1, y1, x2);
+        break;
+    }
+    return id;
+}
+
 QString MainWindow::drawHalfLine(int x1, int y1, int x2, int y2) {
     auto line = new QCPItemHalfLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
+    QPen pen;
+    pen.setColor(QColor(0x003333));
+    pen.setWidth(2);
+    line->setPen(pen);
     line->point1->setCoords(start);
     line->point2->setCoords(end);
     QString id = QString::number(getAndIncrementNextGraphId());
@@ -155,6 +165,10 @@ QString MainWindow::drawSegmentLine(int x1, int y1, int x2, int y2) {
     auto line = new QCPItemLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
+    QPen pen;
+    pen.setColor(QColor(0x666666));
+    pen.setWidth(2);
+    line->setPen(pen);
     line->start->setCoords(start);
     line->end->setCoords(end);
     QString id = QString::number(getAndIncrementNextGraphId());
@@ -176,9 +190,82 @@ void MainWindow::replotPoints() {
 
 void MainWindow::drawPoint(double x, double y) {
     QPen pen;
-    pen.setWidth(5);
+    pen.setWidth(6);
     auto graph = ui->plot->addGraph();
     graph->setData({x}, {y});
     graph->setPen(pen);
     graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDot, 2));
+}
+
+void MainWindow::on_shapeTypeComboBox_currentIndexChanged(int index)
+{
+//    int index = ui->shapeTypeComboBox->currentIndex();
+    if (index == 3) {
+        // index 3: circle
+        ui->spinBoxY2->setEnabled(false);
+    } else {
+        ui->spinBoxY2->setEnabled(true);
+    }
+}
+
+void MainWindow::on_addShapeButton_clicked()
+{
+    qDebug() << "clicked";
+    int shapeTypeInd = ui->shapeTypeComboBox->currentIndex();
+    char shapeType = "LRSC"[shapeTypeInd];
+    int x1 = ui->spinBoxX1->value();
+    int y1 = ui->spinBoxY1->value();
+    int x2 = ui->spinBoxX2->value();
+    int y2 = ui->spinBoxY2->value();
+    int nShape = gmgr->shapes->size(); // TODO upd it
+    gPoint * pointBuffer = new gPoint[nShape * 2];
+    int posBuf = 0;
+    auto err = addShape(gmgr, shapeType, x1, y1, x2, y2, pointBuffer, &posBuf);
+    if(err == ERROR_CODE::SUCCESS){
+        auto id = drawShape(shapeType, x1, y1, x2, y2);
+        gShapes.insert(id, {shapeType, x1, y1, x2, y2});
+        for(int i =0; i<posBuf; ++i){
+            drawPoint(pointBuffer[i].x, pointBuffer[i].y);
+        }
+        delete [] pointBuffer;
+        ui->plot->replot();
+    } else {
+        // TODO
+    }
+}
+
+void MainWindow::on_plot_mouseWheel(QWheelEvent* event)
+{
+    double delta = (double)event->delta();
+    double factor = delta>0 ? 3.3 : (3./1.1);
+    range = range * (factor * abs(delta) / 360);
+    qDebug()<<range;
+    ui->plot->xAxis->setRange(-range,range);
+    ui->plot->yAxis->setRange(-range,range);
+    ui->plot->replot();
+}
+
+void MainWindow::on_plot_mousePress(QMouseEvent* event) {
+    mouseOriX = ui->plot->xAxis->pixelToCoord(event->x());
+    mouseOriY = ui->plot->xAxis->pixelToCoord(event->y());
+    qDebug()<<"mouse down"<<mouseOriX<<mouseOriY;
+}
+
+void MainWindow::on_plot_mouseMove(QMouseEvent* event) {
+    if(event->buttons() & Qt::LeftButton) {
+        // TODO: fix it
+//        double xCoord = ui->plot->xAxis->pixelToCoord(event->x());
+//        double yCoord = ui->plot->yAxis->pixelToCoord(event->y());
+//        double deltaX = xCoord - mouseOriX;
+//        double deltaY = yCoord - mouseOriY;
+//        centerX-=deltaX;
+//        centerY-=deltaY;
+
+//        qDebug()<<mouseOriX<<mouseOriY<<centerX<<centerY;
+//        ui->plot->xAxis->setRange(centerX-range, centerX+range);
+//        ui->plot->yAxis->setRange(centerY-range, centerY+range);
+//        mouseOriX = ui->plot->xAxis->pixelToCoord(event->x());;
+//        mouseOriY = ui->plot->xAxis->pixelToCoord(event->y());;
+//        ui->plot->replot();
+    }
 }
