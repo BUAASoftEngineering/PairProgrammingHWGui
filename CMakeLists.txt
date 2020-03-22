@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
+set(CMAKE_GNUtoMS ON)
 
 project(BUAASoftwareEngineeringPairProgrammingHWGui LANGUAGES CXX)
 
@@ -8,7 +9,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
@@ -55,6 +56,17 @@ else()
   )
 endif()
 
-target_link_libraries(BUAASoftwareEngineeringPairProgrammingHWGui PRIVATE Qt5::Widgets Qt5::PrintSupport)
+find_library(LIBGEOMETRY_LIB libgeometry HINTS ${PROJECT_SOURCE_DIR}/lib)
+if( ${LIBGEOMETRY_LIB} STREQUAL "LIBGEOMETRY_LIB-NOTFOUND")
+    message("not found LIBGEOMETRY_LIB variable")
+endif()
+message("libgeometry dir: ${LIBGEOMETRY_LIB}")
+
+include_directories("${PROJECT_SOURCE_DIR}/include")
+
+target_link_libraries(BUAASoftwareEngineeringPairProgrammingHWGui
+    Qt5::Widgets
+    Qt5::PrintSupport
+    ${LIBGEOMETRY_LIB})
 
 qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
