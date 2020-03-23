@@ -56,7 +56,7 @@ else()
   )
 endif()
 
-find_library(LIBGEOMETRY_LIB libgeometry HINTS ${PROJECT_SOURCE_DIR}/lib)
+find_library(LIBGEOMETRY_LIB gCore HINTS ${PROJECT_SOURCE_DIR}/lib)
 if( ${LIBGEOMETRY_LIB} STREQUAL "LIBGEOMETRY_LIB-NOTFOUND")
     message("not found LIBGEOMETRY_LIB variable")
 endif()

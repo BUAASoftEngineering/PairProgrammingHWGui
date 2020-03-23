@@ -40,8 +40,7 @@ MainWindow::~MainWindow()
 {
     delete ui;
     if(gmgr) {
-        qDebug() << "closing gManager:" << gmgr;
-//        closeManager(gmgr);
+        deleteFigure(gmgr);
     }
 
 }
@@ -61,10 +60,10 @@ void MainWindow::keyPressEvent(QKeyEvent * event) {
             }
             shapes.remove(name);
         }
-        cleanManager(gmgr);
+        cleanFigure(gmgr);
         for(const auto &shapeItem: shapes.values()) {
             auto & shape = shapeItem.gshape;
-            addShape(gmgr, shape.type, shape.x1, shape.y1, shape.x2, shape.y2, nullptr, nullptr);
+            addShapeToFigure(gmgr, {shape.type, shape.x1, shape.y1, shape.x2, shape.y2});
         }
         replotPoints();
         ui->plot->replot();
@@ -77,28 +76,26 @@ void MainWindow::on_actionOpen_triggered()
     // slot handling file open
     auto fname = QFileDialog::getOpenFileName(this, "Select a file to open", ".", "*.txt;*.in");
     qDebug()<<fname;
-    FILE * file;
     if (!fname.isEmpty()) {
-        if(!fopen_s(&file, fname.toStdString().c_str(), "r")) {
-            cleanManager(gmgr);
-            ui->plot->clearItems();
-            shapes.clear();
-            shapeListModel.removeRows(0,shapeListModel.rowCount());
+        cleanFigure(gmgr);
+        ui->plot->clearItems();
+        shapes.clear();
+        shapeListModel.removeRows(0,shapeListModel.rowCount());
 
-            ERROR_INFO err = addShapesBatch(gmgr, file, nullptr, nullptr);
-            int nShape = gmgr->shapes->size(); // TODO: fix here
-            gShape *shapes = new gShape[nShape];
-            getGeometricShapes(gmgr, shapes);
+        ERROR_INFO err = addShapesToFigureFile(gmgr, fname.toStdString().c_str());
+        if(err.code==ERROR_CODE::SUCCESS){
+            updateShapes(gmgr);
+            int nShape = getShapesCount(gmgr);
+
             for(int i = 0; i<nShape; ++i) {
-                auto &shape = shapes[i];
+                auto &shape = gmgr->shapes[i];
                 qDebug() << shape.type;
                 QString id = plotShape(shape.type, shape.x1, shape.y1, shape.x2, shape.y2);
             }
-            delete [] shapes;
-
             replotPoints();
             ui->plot->replot();
-            fclose(file);
+        } else {
+            // TODO
         }
     }
 }
@@ -135,6 +132,7 @@ QString MainWindow::plotShape(char type, int x1, int y1, int x2, int y2)
 {
     QString id = QString::number(getAndIncrementNextGraphId());
     QCPAbstractItem * item;
+    qDebug()<<"plot shape:"<<type<<x1<<y1<<x2<<y2;
     switch(type) {
     case 'L':
         item = drawLine(id, x1, y1, x2, y2);
@@ -158,7 +156,7 @@ QString MainWindow::plotShape(char type, int x1, int y1, int x2, int y2)
     auto lastRowind=shapeListModel.index(shapeListModel.rowCount()-1,0);
     shapeListModel.setData(lastRowind,visName,Qt::DisplayRole);
 
-    shapes.insert(id, {{type, x1, y2, x2, y2}, item, lastRowind});
+    shapes.insert(id, {{type, x1, y1, x2, y2}, item, lastRowind});
     return id;
 }
 
@@ -191,15 +189,13 @@ QCPAbstractItem * MainWindow::drawSegmentLine(const QString &id, int x1, int y1,
 }
 
 void MainWindow::replotPoints() {
+    updatePoints(gmgr);
     ui->plot->clearGraphs();
-    int nPoint = getIntersectionsCount(gmgr);
-    gPoint *points = new gPoint[nPoint];
-    getIntersections(gmgr, points);
-    for(int i = 0; i<nPoint; ++i){
-        auto& point = points[i];
-        drawPoint(point.x, point.y);
+    int nPoint = getPointsCount(gmgr);
+    qDebug()<<"n point:"<<nPoint;
+    for(int i = 0;i <nPoint; ++i){
+        drawPoint(gmgr->points[i].x, gmgr->points[i].y);
     }
-    delete [] points;
 }
 
 void MainWindow::drawPoint(double x, double y) {
@@ -231,16 +227,13 @@ void MainWindow::on_addShapeButton_clicked()
     int y1 = ui->spinBoxY1->value();
     int x2 = ui->spinBoxX2->value();
     int y2 = ui->spinBoxY2->value();
-    int nShape = gmgr->shapes->size(); // TODO upd it
-    gPoint * pointBuffer = new gPoint[nShape * 2];
-    int posBuf = 0;
-    auto err = addShape(gmgr, shapeType, x1, y1, x2, y2, pointBuffer, &posBuf);
-    if(err == ERROR_CODE::SUCCESS){
+
+    auto err = addShapeToFigure(gmgr, {shapeType, x1, y1, x2, y2});
+    if(err.code == ERROR_CODE::SUCCESS){
         auto id = plotShape(shapeType, x1, y1, x2, y2);
-        for(int i =0; i<posBuf; ++i){
-            drawPoint(pointBuffer[i].x, pointBuffer[i].y);
-        }
-        delete [] pointBuffer;
+
+        replotPoints();
+
         ui->plot->replot();
 
     } else {
@@ -282,4 +275,36 @@ void MainWindow::on_plot_mouseMove(QMouseEvent* event) {
 //        mouseOriY = ui->plot->xAxis->pixelToCoord(event->y());;
 //        ui->plot->replot();
     }
+}
+
+void MainWindow::on_deleteButton_clicked()
+{
+    // delete selected shapes in list view
+    auto selected = ui->shapeListView->selectionModel()->selectedIndexes();
+    QVector<QPersistentModelIndex> selectedPers;
+    for (auto index: selected) {
+        auto data = shapeListModel.data(index).toString();
+        auto id = data.section(QChar('_'), 0, 0);
+        qDebug() << data<<id;
+
+        auto shape = shapes.find(id);
+        if(shape!=shapes.end()){
+            ui->plot->removeItem(shape->item);
+        }
+        shapes.remove(id);
+        selectedPers.append(index);
+    }
+    for(auto index: selectedPers) {
+        shapeListModel.removeRow(index.row());
+    }
+    qDebug() << shapes.size();
+    cleanFigure(gmgr);
+//    shapeListModel.removeRows(0, shapeListModel.rowCount());
+//    ui->plot->clearItems();
+    for(auto &item: shapes.values()){
+        auto &gshape = item.gshape;
+        addShapeToFigure(gmgr, gshape);
+    }
+    replotPoints();
+    ui->plot->replot();
 }

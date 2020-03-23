@@ -5,7 +5,7 @@
 #include <QKeyEvent>
 #include <QStringListModel>
 #include <cmath>
-#include "interface.h"
+#include "StdInterface.h"
 #include "qcustomplot.h"
 
 QT_BEGIN_NAMESPACE
@@ -16,7 +16,7 @@ QT_END_NAMESPACE
 struct shape_item_t {
     gShape gshape;
     QCPAbstractItem * item;
-    QModelIndex index;
+    QPersistentModelIndex index;
 };
 
 class MainWindow : public QMainWindow
@@ -32,7 +32,7 @@ protected:
     void keyPressEvent(QKeyEvent *);
 
 private:
-    gManager * gmgr = createManager();
+    gFigure * gmgr = addFigure();
     QMap<QString, shape_item_t> shapes;
     QStringListModel shapeListModel;
 
@@ -67,6 +67,8 @@ private slots:
     void on_plot_mouseMove(QMouseEvent*);
 
     void on_plot_mousePress(QMouseEvent*);
+
+    void on_deleteButton_clicked();
 
 private:
     Ui::MainWindow *ui;
