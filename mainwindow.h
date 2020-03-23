@@ -3,12 +3,21 @@
 
 #include <QMainWindow>
 #include <QKeyEvent>
+#include <QStringListModel>
 #include <cmath>
 #include "interface.h"
+#include "qcustomplot.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+
+struct shape_item_t {
+    gShape gshape;
+    QCPAbstractItem * item;
+    QModelIndex index;
+};
 
 class MainWindow : public QMainWindow
 {
@@ -24,7 +33,8 @@ protected:
 
 private:
     gManager * gmgr = createManager();
-    QMap<QString, gShape> gShapes;
+    QMap<QString, shape_item_t> shapes;
+    QStringListModel shapeListModel;
 
     int nextGraphId = 0;
     double range = 5.0;
@@ -37,11 +47,11 @@ private:
        return nextGraphId ++;
     }
 
-    QString drawCircle(int x, int y, int r);
-    QString drawHalfLine(int x1, int y1, int x2, int y2);
-    QString drawSegmentLine(int x1, int y1, int x2, int y2);
-    QString drawLine(int x1, int y1, int x2, int y2);
-    QString drawShape(char type, int x1, int y1, int x2, int y2);
+    QCPAbstractItem * drawCircle(const QString &id, int x, int y, int r);
+    QCPAbstractItem * drawHalfLine(const QString &id, int x1, int y1, int x2, int y2);
+    QCPAbstractItem * drawSegmentLine(const QString &id, int x1, int y1, int x2, int y2);
+    QCPAbstractItem * drawLine(const QString &id, int x1, int y1, int x2, int y2);
+    QString plotShape(char type, int x1, int y1, int x2, int y2);
     void drawPoint(double x, double y);
     void replotPoints();
 

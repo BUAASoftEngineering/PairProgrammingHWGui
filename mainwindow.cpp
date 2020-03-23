@@ -25,6 +25,8 @@ MainWindow::MainWindow(QWidget *parent)
     customPlot->yAxis->setRange(-range,range);
     customPlot->replot();
 
+    ui->shapeListView->setModel(&shapeListModel);
+
     connect(ui->plot, SIGNAL(mouseWheel(QWheelEvent*)), this, SLOT(on_plot_mouseWheel(QWheelEvent*)));
     connect(ui->plot, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(on_plot_mouseMove(QMouseEvent*)));
     connect(ui->plot, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(on_plot_mousePress(QMouseEvent*)));
@@ -52,12 +54,17 @@ void MainWindow::keyPressEvent(QKeyEvent * event) {
         for(auto& item: items){
             auto name = item->objectName();
             qDebug()<<name;
-            gShapes.remove(name);
             ui->plot->removeItem(item);
-            cleanManager(gmgr);
-            for(const auto &shape: gShapes.values()) {
-                addShape(gmgr, shape.type, shape.x1, shape.y1, shape.x2, shape.y2, nullptr, nullptr);
+            auto shape = shapes.find(name);
+            if(shape!=shapes.end()){
+                shapeListModel.removeRow(shape->index.row());
             }
+            shapes.remove(name);
+        }
+        cleanManager(gmgr);
+        for(const auto &shapeItem: shapes.values()) {
+            auto & shape = shapeItem.gshape;
+            addShape(gmgr, shape.type, shape.x1, shape.y1, shape.x2, shape.y2, nullptr, nullptr);
         }
         replotPoints();
         ui->plot->replot();
@@ -74,8 +81,9 @@ void MainWindow::on_actionOpen_triggered()
     if (!fname.isEmpty()) {
         if(!fopen_s(&file, fname.toStdString().c_str(), "r")) {
             cleanManager(gmgr);
-            gShapes.clear();
             ui->plot->clearItems();
+            shapes.clear();
+            shapeListModel.removeRows(0,shapeListModel.rowCount());
 
             ERROR_INFO err = addShapesBatch(gmgr, file, nullptr, nullptr);
             int nShape = gmgr->shapes->size(); // TODO: fix here
@@ -84,8 +92,7 @@ void MainWindow::on_actionOpen_triggered()
             for(int i = 0; i<nShape; ++i) {
                 auto &shape = shapes[i];
                 qDebug() << shape.type;
-                QString id = drawShape(shape.type, shape.x1, shape.y1, shape.x2, shape.y2);
-                gShapes.insert(id, shape);
+                QString id = plotShape(shape.type, shape.x1, shape.y1, shape.x2, shape.y2);
             }
             delete [] shapes;
 
@@ -96,7 +103,7 @@ void MainWindow::on_actionOpen_triggered()
     }
 }
 
-QString MainWindow::drawCircle(int x, int y, int r) {
+QCPAbstractItem * MainWindow::drawCircle(const QString &id, int x, int y, int r) {
     auto circle = new QCPItemEllipse(ui->plot);
     QPoint topLeft(x-r, y+r);
     QPoint bottomRight(x+r, y-r);
@@ -106,12 +113,11 @@ QString MainWindow::drawCircle(int x, int y, int r) {
     circle->setPen(pen);
     circle->topLeft->setCoords(topLeft);
     circle->bottomRight->setCoords(bottomRight);
-    QString id = QString::number(getAndIncrementNextGraphId());
     circle->setObjectName(id);
-    return id;
+    return circle;
 }
 
-QString MainWindow::drawLine(int x1, int y1, int x2, int y2) {
+QCPAbstractItem * MainWindow::drawLine(const QString &id, int x1, int y1, int x2, int y2) {
     auto line = new QCPItemStraightLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
@@ -121,32 +127,42 @@ QString MainWindow::drawLine(int x1, int y1, int x2, int y2) {
     line->setPen(pen);
     line->point1->setCoords(start);
     line->point2->setCoords(end);
-    QString id = QString::number(getAndIncrementNextGraphId());
     line->setObjectName(id);
-    return id;
+    return line;
 }
 
-QString MainWindow::drawShape(char type, int x1, int y1, int x2, int y2)
+QString MainWindow::plotShape(char type, int x1, int y1, int x2, int y2)
 {
-    QString id;
+    QString id = QString::number(getAndIncrementNextGraphId());
+    QCPAbstractItem * item;
     switch(type) {
     case 'L':
-        id = drawLine(x1, y1, x2, y2);
+        item = drawLine(id, x1, y1, x2, y2);
         break;
     case 'R':
-        id = drawHalfLine(x1, y1, x2, y2);
+        item = drawHalfLine(id, x1, y1, x2, y2);
         break;
     case 'S':
-        id = drawSegmentLine(x1, y1, x2, y2);
+        item = drawSegmentLine(id, x1, y1, x2, y2);
         break;
     case 'C':
-        id = drawCircle(x1, y1, x2);
+        item = drawCircle(id, x1, y1, x2);
         break;
     }
+
+    QString visName = id+"_"+type+"_"+QString::number(x1)+"_"+QString::number(y1)+"_"+QString::number(x2);
+    if(type!='C'){
+        visName += "_" + QString::number(y2);
+    }
+    shapeListModel.insertRow(shapeListModel.rowCount());
+    auto lastRowind=shapeListModel.index(shapeListModel.rowCount()-1,0);
+    shapeListModel.setData(lastRowind,visName,Qt::DisplayRole);
+
+    shapes.insert(id, {{type, x1, y2, x2, y2}, item, lastRowind});
     return id;
 }
 
-QString MainWindow::drawHalfLine(int x1, int y1, int x2, int y2) {
+QCPAbstractItem * MainWindow::drawHalfLine(const QString &id, int x1, int y1, int x2, int y2) {
     auto line = new QCPItemHalfLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
@@ -156,12 +172,11 @@ QString MainWindow::drawHalfLine(int x1, int y1, int x2, int y2) {
     line->setPen(pen);
     line->point1->setCoords(start);
     line->point2->setCoords(end);
-    QString id = QString::number(getAndIncrementNextGraphId());
     line->setObjectName(id);
-    return id;
+    return line;
 }
 
-QString MainWindow::drawSegmentLine(int x1, int y1, int x2, int y2) {
+QCPAbstractItem * MainWindow::drawSegmentLine(const QString &id, int x1, int y1, int x2, int y2) {
     auto line = new QCPItemLine(ui->plot);
     QPoint start(x1, y1);
     QPoint end(x2, y2);
@@ -171,9 +186,8 @@ QString MainWindow::drawSegmentLine(int x1, int y1, int x2, int y2) {
     line->setPen(pen);
     line->start->setCoords(start);
     line->end->setCoords(end);
-    QString id = QString::number(getAndIncrementNextGraphId());
     line->setObjectName(id);
-    return id;
+    return line;
 }
 
 void MainWindow::replotPoints() {
@@ -222,13 +236,13 @@ void MainWindow::on_addShapeButton_clicked()
     int posBuf = 0;
     auto err = addShape(gmgr, shapeType, x1, y1, x2, y2, pointBuffer, &posBuf);
     if(err == ERROR_CODE::SUCCESS){
-        auto id = drawShape(shapeType, x1, y1, x2, y2);
-        gShapes.insert(id, {shapeType, x1, y1, x2, y2});
+        auto id = plotShape(shapeType, x1, y1, x2, y2);
         for(int i =0; i<posBuf; ++i){
             drawPoint(pointBuffer[i].x, pointBuffer[i].y);
         }
         delete [] pointBuffer;
         ui->plot->replot();
+
     } else {
         // TODO
     }
