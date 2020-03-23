@@ -3,6 +3,8 @@ set(CMAKE_GNUtoMS ON)
 
 project(BUAASoftwareEngineeringPairProgrammingHWGui LANGUAGES CXX)
 
+set(CMAKE_SKIP_RPATH ON)
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_AUTOUIC ON)

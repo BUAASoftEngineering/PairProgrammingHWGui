@@ -65,6 +65,9 @@ void MainWindow::keyPressEvent(QKeyEvent * event) {
             auto & shape = shapeItem.gshape;
             addShapeToFigure(gmgr, {shape.type, shape.x1, shape.y1, shape.x2, shape.y2});
         }
+        if(getShapesCount(gmgr) == 0){
+            nextGraphId = 0; //reset;
+        }
         replotPoints();
         ui->plot->replot();
     }
@@ -81,6 +84,7 @@ void MainWindow::on_actionOpen_triggered()
         ui->plot->clearItems();
         shapes.clear();
         shapeListModel.removeRows(0,shapeListModel.rowCount());
+        nextGraphId = 0; // reset id
 
         ERROR_INFO err = addShapesToFigureFile(gmgr, fname.toStdString().c_str());
         if(err.code==ERROR_CODE::SUCCESS){
@@ -92,11 +96,13 @@ void MainWindow::on_actionOpen_triggered()
                 qDebug() << shape.type;
                 QString id = plotShape(shape.type, shape.x1, shape.y1, shape.x2, shape.y2);
             }
+
             replotPoints();
-            ui->plot->replot();
         } else {
-            // TODO
+            cleanFigure(gmgr);
+            QMessageBox::warning(this, "批量导入失败", err.messages+QString("\n At line ")+QString::number(err.lineNoStartedWithZero));
         }
+        ui->plot->replot();
     }
 }
 
@@ -148,15 +154,26 @@ QString MainWindow::plotShape(char type, int x1, int y1, int x2, int y2)
         break;
     }
 
-    QString visName = id+"_"+type+"_"+QString::number(x1)+"_"+QString::number(y1)+"_"+QString::number(x2);
+    QString visName = id+": "+type+" "+QString::number(x1)+","+QString::number(y1)+","+QString::number(x2);
     if(type!='C'){
-        visName += "_" + QString::number(y2);
+        visName += "," + QString::number(y2);
     }
     shapeListModel.insertRow(shapeListModel.rowCount());
     auto lastRowind=shapeListModel.index(shapeListModel.rowCount()-1,0);
     shapeListModel.setData(lastRowind,visName,Qt::DisplayRole);
 
     shapes.insert(id, {{type, x1, y1, x2, y2}, item, lastRowind});
+
+    // TODO introduce movable center
+    double r1 = std::abs(gmgr->upperleft.x);
+    double r2 = std::abs(gmgr->upperleft.y);
+    double r3 = std::abs(gmgr->lowerright.x);
+    double r4 = std::abs(gmgr->lowerright.y);
+    range = std::max(std::max(std::max(r1,r2),r3),r4);
+    range += 1; // margin
+    ui->plot->xAxis->setRange(-range, range);
+    ui->plot->yAxis->setRange(-range, range);
+
     return id;
 }
 
@@ -237,7 +254,7 @@ void MainWindow::on_addShapeButton_clicked()
         ui->plot->replot();
 
     } else {
-        // TODO
+        QMessageBox::warning(this, "添加形状失败", err.messages);
     }
 }
 
@@ -284,7 +301,7 @@ void MainWindow::on_deleteButton_clicked()
     QVector<QPersistentModelIndex> selectedPers;
     for (auto index: selected) {
         auto data = shapeListModel.data(index).toString();
-        auto id = data.section(QChar('_'), 0, 0);
+        auto id = data.section(QChar(':'), 0, 0);
         qDebug() << data<<id;
 
         auto shape = shapes.find(id);
@@ -304,6 +321,9 @@ void MainWindow::on_deleteButton_clicked()
     for(auto &item: shapes.values()){
         auto &gshape = item.gshape;
         addShapeToFigure(gmgr, gshape);
+    }
+    if(getShapesCount(gmgr) == 0){
+        nextGraphId = 0; //reset;
     }
     replotPoints();
     ui->plot->replot();
