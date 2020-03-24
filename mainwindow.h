@@ -54,6 +54,7 @@ private:
     QString plotShape(char type, int x1, int y1, int x2, int y2);
     void drawPoint(double x, double y);
     void replotPoints();
+    void rescale();
 
 private slots:
     void on_actionOpen_triggered();

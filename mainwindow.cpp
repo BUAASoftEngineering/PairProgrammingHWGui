@@ -21,8 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     customPlot->yAxis->setLabel("y");
     // set axes ranges, so we see all data:
 
-    customPlot->xAxis->setRange(-range,range);
-    customPlot->yAxis->setRange(-range,range);
+    rescale();
     customPlot->replot();
 
     ui->shapeListView->setModel(&shapeListModel);
@@ -165,14 +164,17 @@ QString MainWindow::plotShape(char type, int x1, int y1, int x2, int y2)
     shapes.insert(id, {{type, x1, y1, x2, y2}, item, lastRowind});
 
     // TODO introduce movable center
-    double r1 = std::abs(gmgr->upperleft.x);
-    double r2 = std::abs(gmgr->upperleft.y);
-    double r3 = std::abs(gmgr->lowerright.x);
-    double r4 = std::abs(gmgr->lowerright.y);
-    range = std::max(std::max(std::max(r1,r2),r3),r4);
-    range += 1; // margin
-    ui->plot->xAxis->setRange(-range, range);
-    ui->plot->yAxis->setRange(-range, range);
+    double ltx = gmgr->upperleft.x;
+    double lty = gmgr->upperleft.y;
+    double rbx = gmgr->lowerright.x;
+    double rby = gmgr->lowerright.y;
+
+    centerX = (ltx+rbx) / 2;
+    centerY = (lty+rby) / 2;
+    qDebug()<<"cx-cy-r:"<<centerX<<centerY<<range;
+    range = std::max(std::abs(ltx-centerX), std::abs(lty-centerY));
+    range += 3; // margin
+    rescale();
 
     return id;
 }
@@ -264,8 +266,7 @@ void MainWindow::on_plot_mouseWheel(QWheelEvent* event)
     double factor = delta>0 ? 3.3 : (3./1.1);
     range = range * (factor * abs(delta) / 360);
     qDebug()<<range;
-    ui->plot->xAxis->setRange(-range,range);
-    ui->plot->yAxis->setRange(-range,range);
+    rescale();
     ui->plot->replot();
 }
 
@@ -327,4 +328,9 @@ void MainWindow::on_deleteButton_clicked()
     }
     replotPoints();
     ui->plot->replot();
+}
+
+void MainWindow::rescale(){
+    ui->plot->xAxis->setRange(centerX-range,centerX+range);
+    ui->plot->yAxis->setRange(centerY-range,centerY+range);
 }
